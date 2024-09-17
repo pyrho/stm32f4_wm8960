@@ -21,11 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lcd.h"
 #include "stm32f4xx_hal_i2s.h"
 #include "wm8960.h"
-#include <string.h>
 #include <stdio.h>
-#include "lcd.h"
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -36,6 +36,25 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+const uint16_t triangle_wave[] = {
+    0x400,  0x800,  0xc00,  0x1000, 0x1400, 0x1800, 0x1c00, 0x2000, 0x2400,
+    0x2800, 0x2c00, 0x3000, 0x3400, 0x3800, 0x3c00, 0x4000, 0x4400, 0x4800,
+    0x4c00, 0x5000, 0x5400, 0x5800, 0x5c00, 0x6000, 0x6400, 0x6800, 0x6c00,
+    0x7000, 0x7400, 0x7800, 0x7c00, 0x8000, 0x83ff, 0x87ff, 0x8bff, 0x8fff,
+    0x93ff, 0x97ff, 0x9bff, 0x9fff, 0xa3ff, 0xa7ff, 0xabff, 0xafff, 0xb3ff,
+    0xb7ff, 0xbbff, 0xbfff, 0xc3ff, 0xc7ff, 0xcbff, 0xcfff, 0xd3ff, 0xd7ff,
+    0xdbff, 0xdfff, 0xe3ff, 0xe7ff, 0xebff, 0xefff, 0xf3ff, 0xf7ff, 0xfbff,
+    0xffff, 0xfbff, 0xf7ff, 0xf3ff, 0xefff, 0xebff, 0xe7ff, 0xe3ff, 0xdfff,
+    0xdbff, 0xd7ff, 0xd3ff, 0xcfff, 0xcbff, 0xc7ff, 0xc3ff, 0xbfff, 0xbbff,
+    0xb7ff, 0xb3ff, 0xafff, 0xabff, 0xa7ff, 0xa3ff, 0x9fff, 0x9bff, 0x97ff,
+    0x93ff, 0x8fff, 0x8bff, 0x87ff, 0x83ff, 0x8000, 0x7c00, 0x7800, 0x7400,
+    0x7000, 0x6c00, 0x6800, 0x6400, 0x6000, 0x5c00, 0x5800, 0x5400, 0x5000,
+    0x4c00, 0x4800, 0x4400, 0x4000, 0x3c00, 0x3800, 0x3400, 0x3000, 0x2c00,
+    0x2800, 0x2400, 0x2000, 0x1c00, 0x1800, 0x1400, 0x1000, 0xc00,  0x800,
+    0x400,  0x0,
+};
+const uint8_t tri_cnt = 0;
 
 /* USER CODE END PD */
 
@@ -64,40 +83,40 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_I2S2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_I2S2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define BUFFER_SIZE 200
-int16_t adcData[BUFFER_SIZE];
-int16_t dacData[BUFFER_SIZE];
-static volatile int16_t *inBufPtr;
-static volatile int16_t *outBufPtr = &dacData[0];
+#define BUFFER_SIZE 2000
+uint16_t adcData[BUFFER_SIZE];
+uint16_t dacData[BUFFER_SIZE];
+uint16_t *inBufPtr = &adcData[0];
+uint16_t *outBufPtr = &dacData[0];
 char g_messageBuf[60];
 // void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s);
-void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
-
-  strcpy((char *)g_messageBuf, "[WOW] Fuck yea\r\n");
-  HAL_UART_Transmit(&huart3, (uint8_t *)&g_messageBuf, strlen(g_messageBuf),
-                    HAL_MAX_DELAY);
-}
+//void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
+//
+//  strcpy((char *)g_messageBuf, "[WOW] Fuck yea\r\n");
+//  HAL_UART_Transmit(&huart3, (uint8_t *)&g_messageBuf, strlen(g_messageBuf),
+//                    HAL_MAX_DELAY);
+//}
 
 void initLcd() {
-	  HD44780_Init(2);
-	  HD44780_Clear();
-	  HD44780_SetBacklight(1);
-	  HD44780_SetCursor(0, 0);
-	  HD44780_PrintStr("FXBOI:RDY");
+  HD44780_Init(2);
+  HD44780_Clear();
+  HD44780_SetBacklight(1);
+  HD44780_SetCursor(0, 0);
+  HD44780_PrintStr("FXBOI:RDY");
 }
 
-void displayToLcd(char* message) {
-	HD44780_Clear();
-	HD44780_PrintStr(message);
+void displayToLcd(char *message) {
+  HD44780_Clear();
+  HD44780_PrintStr(message);
 }
 
 void testLcd() {
@@ -153,8 +172,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
   cnt = __HAL_TIM_GET_COUNTER(htim);
   char str[10];
 
-  sprintf( &str, "%lu", cnt );
-  displayToLcd(&str);
+  sprintf(&str, "%lu", cnt);
+//  displayToLcd(&str);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
@@ -210,33 +229,49 @@ int main(void)
   MX_GPIO_Init();
   MX_USART3_UART_Init();
   MX_I2C1_Init();
-  MX_I2S2_Init();
   MX_TIM3_Init();
   MX_TIM6_Init();
+  MX_I2S2_Init();
   /* USER CODE BEGIN 2 */
 
   // This timer is used for the incremental encoder
   HAL_TIM_Encoder_Start_IT(&htim3, TIM_CHANNEL_ALL);
   // testLcd();
-//  initLcd();
+  //  initLcd();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+
   while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_StatusTypeDef halReturnStatus = HAL_I2S_Receive(
-        &hi2s2, (uint16_t *)&adcData, BUFFER_SIZE, HAL_MAX_DELAY);
+
+
+	  memcpy(outBufPtr, inBufPtr, BUFFER_SIZE * sizeof(outBufPtr[0]));
+	 // HAL_StatusTypeDef halReturnStatus = HAL_I2SEx_TransmitReceive(&hi2s2, outBufPtr, inBufPtr, BUFFER_SIZE, 1000);
+	 HAL_StatusTypeDef halReturnStatus = HAL_I2SEx_TransmitReceive(&hi2s2, inBufPtr, inBufPtr, BUFFER_SIZE, 1000);
+
+//    HAL_StatusTypeDef halReturnStatus = HAL_I2S_Receive(
+//        &hi2s2, (uint16_t *)&adcData, BUFFER_SIZE, HAL_MAX_DELAY);
+
+//    halReturnStatus += HAL_I2S_Transmit(
+//        &hi2s2, (uint16_t *)&triangle_wave,
+//        sizeof(triangle_wave) / sizeof(triangle_wave[0]), HAL_MAX_DELAY);
+//
+//
+    // halReturnStatus += HAL_I2S_Transmit(&hi2s2, (uint16_t *)&adcData,
+    // BUFFER_SIZE, HAL_MAX_DELAY);
 
     if (halReturnStatus != HAL_OK) {
       strcpy((char *)messageBuf, "[ERROR] Failed to start I2S DMA.\r\n");
       HAL_UART_Transmit(&huart3, (uint8_t *)&messageBuf, strlen(messageBuf),
                         HAL_MAX_DELAY);
-//      return 1;
+      //      return 1;
     }
-    HAL_Delay(100);
+    // HAL_Delay(100);
     // HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
   }
   /* USER CODE END 3 */
@@ -263,11 +298,11 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 384;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 100;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 8;
-  RCC_OscInitStruct.PLL.PLLR = 2;
+  RCC_OscInitStruct.PLL.PLLR = 3;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -366,10 +401,10 @@ static void MX_I2S2_Init(void)
   hi2s2.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s2.Init.DataFormat = I2S_DATAFORMAT_16B;
   hi2s2.Init.MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
-  hi2s2.Init.AudioFreq = 44100;
+  hi2s2.Init.AudioFreq = I2S_AUDIOFREQ_48K;
   hi2s2.Init.CPOL = I2S_CPOL_LOW;
   hi2s2.Init.ClockSource = I2S_CLOCK_PLL;
-  hi2s2.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
+  hi2s2.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_ENABLE;
   if (HAL_I2S_Init(&hi2s2) != HAL_OK)
   {
     Error_Handler();

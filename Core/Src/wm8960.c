@@ -244,7 +244,7 @@ HAL_StatusTypeDef _writeMultiBits(WM8960_t *dev, uint8_t registerAddress,
 }
 
 HAL_StatusTypeDef pgaLeftIPVUSet(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_LEFT_INPUT_VOLUME, 8, 1);
+  return _writeBit(dev, WM8960_R00_LEFT_INPUT_VOLUME, 8, 1);
 }
 
 // 0-63, (0 = -17.25dB) <<-- 0.75dB steps -->> (63 = +30dB)
@@ -252,7 +252,7 @@ HAL_StatusTypeDef _setLINVOL(WM8960_t *dev, uint8_t volume) {
   if (volume > 63)
     volume = 63; // Limit incoming values max
   HAL_StatusTypeDef result1 =
-      _writeMultiBits(dev, WM8960_REG_LEFT_INPUT_VOLUME, 5, 0, volume);
+      _writeMultiBits(dev, WM8960_R00_LEFT_INPUT_VOLUME, 5, 0, volume);
   HAL_StatusTypeDef result2 = pgaLeftIPVUSet(dev);
   return (result1 + result2);
 }
@@ -269,7 +269,7 @@ HAL_StatusTypeDef _setLINVOLDB(WM8960_t *dev, float dB) {
 
 // Causes left and right input PGA volumes to be updated (LINVOL and RINVOL)
 HAL_StatusTypeDef pgaRightIPVUSet(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_RIGHT_INPUT_VOLUME, 8, 1);
+  return _writeBit(dev, WM8960_R01_RIGHT_INPUT_VOLUME, 8, 1);
 }
 
 // 0-63, (0 = -17.25dB) <<-- 0.75dB steps -->> (63 = +30dB)
@@ -277,7 +277,7 @@ HAL_StatusTypeDef _setRINVOL(WM8960_t *dev, uint8_t volume) {
   if (volume > 63)
     volume = 63; // Limit incoming values max
   HAL_StatusTypeDef result1 =
-      _writeMultiBits(dev, WM8960_REG_RIGHT_INPUT_VOLUME, 5, 0, volume);
+      _writeMultiBits(dev, WM8960_R01_RIGHT_INPUT_VOLUME, 5, 0, volume);
   HAL_StatusTypeDef result2 = pgaRightIPVUSet(dev);
   return result1 + result2;
 }
@@ -302,7 +302,7 @@ bool _setRINVOLDB(WM8960_t *dev, float dB) {
 HAL_StatusTypeDef _RESET(WM8960_t *dev) {
   // Writing any bit to this register will cause a reset, (1,1) was chosen at
   // random
-  return _writeBit(dev, WM8960_REG_RESET, 1, 1);
+  return _writeBit(dev, WM8960_R15_RESET, 1, 1);
 }
 
 /**
@@ -311,63 +311,71 @@ HAL_StatusTypeDef _RESET(WM8960_t *dev) {
  * See P. 64.
  */
 HAL_StatusTypeDef _VREF(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_1, 6, 1);
+  return _writeBit(dev, WM8960_R25_PWR_MGMT_1, 6, 1);
 }
 
 HAL_StatusTypeDef _VMIDSEL(WM8960_t *dev) {
-  return _writeMultiBits(dev, WM8960_REG_PWR_MGMT_1, 8, 7,
+  return _writeMultiBits(dev, WM8960_R25_PWR_MGMT_1, 8, 7,
                          WM8960_SETTING_VMIDSEL_2X50KOHM);
 }
 
 /** Enable Left Output mixer */
 HAL_StatusTypeDef _LOMIX(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_3, 3, 1);
+  return _writeBit(dev, WM8960_R47_PWR_MGMT_3, 3, 1);
 }
 
 /** Enable Right Output mixer */
 HAL_StatusTypeDef _ROMIX(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_3, 4, 1);
+  return _writeBit(dev, WM8960_R47_PWR_MGMT_3, 4, 1);
 }
 
 /** Enable Left ADC */
 HAL_StatusTypeDef _ADCL(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_1, 3, 1);
+  return _writeBit(dev, WM8960_R25_PWR_MGMT_1, 3, 1);
+}
+
+HAL_StatusTypeDef _DACL(WM8960_t *dev) {
+  return _writeBit(dev, WM8960_R26_PWR_MGMT_2, 8, 1);
+}
+
+HAL_StatusTypeDef _DACR(WM8960_t *dev) {
+  return _writeBit(dev, WM8960_R26_PWR_MGMT_2, 7, 1);
 }
 
 /** Enable Right ADC */
 HAL_StatusTypeDef _ADCR(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_1, 2, 1);
+  return _writeBit(dev, WM8960_R25_PWR_MGMT_1, 2, 1);
 }
 
 // P.23
 HAL_StatusTypeDef _LMICBOOST(WM8960_t *dev) {
-  return _writeMultiBits(dev, WM8960_REG_ADCL_SIGNAL_PATH, 5, 4,
+  return _writeMultiBits(dev, WM8960_R32_ADCL_SIGNAL_PATH, 5, 4,
                          WM8960_SETTING_MIC_BOOST_GAIN_0DB);
 }
 
 HAL_StatusTypeDef _AINL(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_1, 5, 1);
+  return _writeBit(dev, WM8960_R25_PWR_MGMT_1, 5, 1);
 }
 
 HAL_StatusTypeDef _AINR(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_1, 4, 1);
+  return _writeBit(dev, WM8960_R25_PWR_MGMT_1, 4, 1);
 }
 
 HAL_StatusTypeDef _CLKSEL(WM8960_t *dev) {
   // P.57 - MCLK
-  return _writeBit(dev, WM8960_REG_CLOCKING_1, 0, 0);
+  return _writeBit(dev, WM8960_R04_CLOCKING_1, 0, 0);
 }
 
 HAL_StatusTypeDef _SYSCLKDIV(WM8960_t *dev) {
   // P.57 - MCLK is 24mhz, dividing by 2 gives 12mhz ~
   // BCLK output from STM32 is 1.4mhz
   // Like in that table P.57
-  return _writeMultiBits(dev, WM8960_REG_CLOCKING_1, 2, 1,
+  return _writeMultiBits(dev, WM8960_R04_CLOCKING_1, 2, 1,
                          WM8960_SYSCLK_DIV_BY_2);
 }
 
 HAL_StatusTypeDef _enablePLL(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_2, 0, 1);
+  return _writeBit(dev, WM8960_R26_PWR_MGMT_2, 0, 1);
 }
 
 HAL_StatusTypeDef _setHeadphoneVolume(WM8960_t *dev, uint8_t volume) {
@@ -386,17 +394,17 @@ HAL_StatusTypeDef _setHeadphoneVolume(WM8960_t *dev, uint8_t volume) {
 
   // LEFT
   HAL_StatusTypeDef result1 =
-      _writeMultiBits(dev, WM8960_REG_LOUT1_VOLUME, 6, 0, volume);
+      _writeMultiBits(dev, WM8960_R02_LOUT1_VOLUME, 6, 0, volume);
   // RIGHT
   HAL_StatusTypeDef result2 =
-      _writeMultiBits(dev, WM8960_REG_ROUT1_VOLUME, 6, 0, volume);
+      _writeMultiBits(dev, WM8960_R03_ROUT1_VOLUME, 6, 0, volume);
   // UPDATES
 
   // Updated left channel
-  HAL_StatusTypeDef result3 = _writeBit(dev, WM8960_REG_LOUT1_VOLUME, 8, 1);
+  HAL_StatusTypeDef result3 = _writeBit(dev, WM8960_R02_LOUT1_VOLUME, 8, 1);
 
   // Updated right channel
-  HAL_StatusTypeDef result4 = _writeBit(dev, WM8960_REG_ROUT1_VOLUME, 8, 1);
+  HAL_StatusTypeDef result4 = _writeBit(dev, WM8960_R03_ROUT1_VOLUME, 8, 1);
 
   return result1 + result2 + result3 + result4;
 }
@@ -427,139 +435,133 @@ HAL_StatusTypeDef _setHeadphoneVolumeDB(WM8960_t *dev, float dB) {
 
  */
 
+HAL_StatusTypeDef _clockConfigurationNew(WM8960_t *dev) {
+  // P.61
+  // The breakout board has a 24mhz crystal supplying MCLK.
+  // Use the values from Table 45 to
+  return _writeBit(dev, WM8960_R04_CLOCKING_1, 0, WM8960_CLKSEL_MCLK);
+
+         // P.57 - MCLK is 24mhz, dividing by 2 gives 12mhz ~
+         // This will derive SYSCLK from MCLK/2
+         // Like in that table P.57
+         // _writeMultiBits(dev, WM8960_R04_CLOCKING_1, 2, 1,
+         //                 WM8960_SYSCLK_DIV_BY_2);
+}
+
 HAL_StatusTypeDef _clockConfiguration(WM8960_t *dev) {
   // P.61
   // The breakout board has a 24mhz crystal supplying MCLK.
   // Use the values from Table 45 to
   return _enablePLL(dev) +
-         _writeBit(dev, WM8960_REG_PLL_N, 5, WM8960_PLL_MODE_FRACTIONAL) +
-         _writeBit(dev, WM8960_REG_CLOCKING_1, 0, WM8960_CLKSEL_MCLK) +
+         _writeBit(dev, WM8960_R52_PLL_N, 5, WM8960_PLL_MODE_FRACTIONAL) +
+         _writeBit(dev, WM8960_R04_CLOCKING_1, 0, WM8960_CLKSEL_MCLK) +
          _SYSCLKDIV(dev) +
-         _writeMultiBits(dev, WM8960_REG_CLOCKING_2, 3, 0, 4) +
-         _writeMultiBits(dev, WM8960_REG_CLOCKING_2, 8, 6, 7) +
-         _writeBit(dev, WM8960_REG_PLL_N, 4, WM8960_PLLPRESCALE_DIV_2) +
+         _writeMultiBits(dev, WM8960_R08_CLOCKING_2, 3, 0, 4) +
+         _writeMultiBits(dev, WM8960_R08_CLOCKING_2, 8, 6, 7) +
+         _writeBit(dev, WM8960_R52_PLL_N, 4, WM8960_PLLPRESCALE_DIV_2) +
 
-         _writeMultiBits(dev, WM8960_REG_PLL_N, 3, 0, 0x07) +
+         _writeMultiBits(dev, WM8960_R52_PLL_N, 3, 0, 0x07) +
          // 0x86C226 See table 45
-         _writeMultiBits(dev, WM8960_REG_PLL_K_1, 5, 0, 0x86) +
-         _writeMultiBits(dev, WM8960_REG_PLL_K_2, 8, 0, 0xC2) +
-         _writeMultiBits(dev, WM8960_REG_PLL_K_3, 8, 0, 0x26) // _CLKSEL(dev) +
-      ;
-}
-
-HAL_StatusTypeDef _clockConfiguration2(WM8960_t *dev) {
-  // P.61
-  // The breakout board has a 24mhz crystal supplying MCLK.
-  // Use the values from Table 45 to
-  return _writeBit(dev, WM8960_REG_PLL_N, 5, WM8960_PLL_MODE_FRACTIONAL) +
-         _writeBit(dev, WM8960_REG_CLOCKING_1, 0, WM8960_CLKSEL_MCLK) +
-         _SYSCLKDIV(dev) +
-         _writeMultiBits(dev, WM8960_REG_CLOCKING_2, 3, 0, 4) +
-         _writeMultiBits(dev, WM8960_REG_CLOCKING_2, 8, 6, 7) +
-         _writeBit(dev, WM8960_REG_PLL_N, 4, WM8960_PLLPRESCALE_DIV_2) +
-
-         _writeMultiBits(dev, WM8960_REG_PLL_N, 3, 0, 0x07) +
-         // 0x86C226 See table 45
-         _writeMultiBits(dev, WM8960_REG_PLL_K_1, 5, 0, 0x86) +
-         _writeMultiBits(dev, WM8960_REG_PLL_K_2, 8, 0, 0xC2) +
-         _writeMultiBits(dev, WM8960_REG_PLL_K_3, 8, 0, 0x26) // _CLKSEL(dev) +
+         _writeMultiBits(dev, WM8960_R53_PLL_K_1, 5, 0, 0x86) +
+         _writeMultiBits(dev, WM8960_R54_PLL_K_2, 8, 0, 0xC2) +
+         _writeMultiBits(dev, WM8960_R55_PLL_K_3, 8, 0, 0x26) // _CLKSEL(dev) +
       ;
 }
 
 // P.23
 HAL_StatusTypeDef _RMICBOOST(WM8960_t *dev) {
-  return _writeMultiBits(dev, WM8960_REG_ADCR_SIGNAL_PATH, 5, 4,
+  return _writeMultiBits(dev, WM8960_R33_ADCR_SIGNAL_PATH, 5, 4,
                          WM8960_SETTING_MIC_BOOST_GAIN_0DB);
 }
 
 HAL_StatusTypeDef _LIN2BOOST(WM8960_t *dev) {
-  return _writeMultiBits(dev, WM8960_REG_INPUT_BOOST_MIXER_1, 3, 1,
+  return _writeMultiBits(dev, WM8960_R43_INPUT_BOOST_MIXER_1, 3, 1,
                          WM8960_SETTING_LINBOOST_GAIN_0DB);
 }
 
 HAL_StatusTypeDef _LMN1(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_ADCL_SIGNAL_PATH, 8, 1);
+  return _writeBit(dev, WM8960_R32_ADCL_SIGNAL_PATH, 8, 1);
 }
 
 HAL_StatusTypeDef _RMN1(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_ADCR_SIGNAL_PATH, 8, 1);
+  return _writeBit(dev, WM8960_R33_ADCR_SIGNAL_PATH, 8, 1);
 }
 
 HAL_StatusTypeDef _RMIC(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_3, 5, 1);
+  return _writeBit(dev, WM8960_R47_PWR_MGMT_3, 5, 1);
 }
 
 HAL_StatusTypeDef _LMIC2B(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_ADCL_SIGNAL_PATH, 3, 1);
+  return _writeBit(dev, WM8960_R32_ADCL_SIGNAL_PATH, 3, 1);
 }
 
 HAL_StatusTypeDef _RMIC2B(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_ADCR_SIGNAL_PATH, 3, 1);
+  return _writeBit(dev, WM8960_R33_ADCR_SIGNAL_PATH, 3, 1);
 }
 
 HAL_StatusTypeDef _LMIC(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_PWR_MGMT_3, 4, 1);
+  return _writeBit(dev, WM8960_R47_PWR_MGMT_3, 4, 1);
 }
 
 HAL_StatusTypeDef _LINMUTE(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_LEFT_INPUT_VOLUME, 7, 0) +
+  return _writeBit(dev, WM8960_R00_LEFT_INPUT_VOLUME, 7, 0) +
 
          // Input PGA Volume Update
          // Writing a 1 to this bit will cause left and right input PGA volumes
          // to be updated (LINVOL and RINVOL)
-         _writeBit(dev, WM8960_REG_LEFT_INPUT_VOLUME, 8, 1);
+         _writeBit(dev, WM8960_R00_LEFT_INPUT_VOLUME, 8, 1);
 }
 
 HAL_StatusTypeDef _RINMUTE(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_RIGHT_INPUT_VOLUME, 7, 0) +
+  return _writeBit(dev, WM8960_R01_RIGHT_INPUT_VOLUME, 7, 0) +
          // Input PGA Volume Update
          // Writing a 1 to this bit will cause left and right input PGA volumes
          // to be updated (LINVOL and RINVOL)
-         _writeBit(dev, WM8960_REG_RIGHT_INPUT_VOLUME, 8, 1);
+         _writeBit(dev, WM8960_R01_RIGHT_INPUT_VOLUME, 8, 1);
 }
 
 HAL_StatusTypeDef _RIN2BOOST(WM8960_t *dev) {
-  return _writeMultiBits(dev, WM8960_REG_INPUT_BOOST_MIXER_2, 3, 1,
+  return _writeMultiBits(dev, WM8960_R44_INPUT_BOOST_MIXER_2, 3, 1,
                          WM8960_SETTING_LINBOOST_GAIN_0DB);
 }
 
 /** Set the codec in Master mode, slave by default */
 HAL_StatusTypeDef _MS_setMaster(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_AUDIO_INTERFACE_1, 6, 1);
+  return _writeBit(dev, WM8960_R07_AUDIO_INTERFACE_1, 6, 1);
 }
 
 HAL_StatusTypeDef _MS_setSlave(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_AUDIO_INTERFACE_1, 6, 0);
+  return _writeBit(dev, WM8960_R07_AUDIO_INTERFACE_1, 6, 0);
 }
 
 HAL_StatusTypeDef _enableLB2LO(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_BYPASS_1, 7, 1);
+  return _writeBit(dev, WM8960_R45_BYPASS_1, 7, 1);
 }
 
 HAL_StatusTypeDef _enableRB2RO(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_BYPASS_2, 7, 1);
+  return _writeBit(dev, WM8960_R46_BYPASS_2, 7, 1);
 }
 
 // Valid inputs are 0-7. 0 = 0dB ...3dB steps... 7 = -21dB
 HAL_StatusTypeDef _setLB2LOVOL(WM8960_t *dev, uint8_t volume) {
   if (volume > 7)
     volume = 7; // Limit incoming values max
-  return _writeMultiBits(dev, WM8960_REG_BYPASS_1, 6, 4, volume);
+  return _writeMultiBits(dev, WM8960_R45_BYPASS_1, 6, 4, volume);
 }
 
 // Valid inputs are 0-7. 0 = 0dB ...3dB steps... 7 = -21dB
 HAL_StatusTypeDef _setRB2ROVOL(WM8960_t *dev, uint8_t volume) {
   if (volume > 7)
     volume = 7; // Limit incoming values max
-  return _writeMultiBits(dev, WM8960_REG_BYPASS_2, 6, 4, volume);
+  return _writeMultiBits(dev, WM8960_R46_BYPASS_2, 6, 4, volume);
 }
 
 HAL_StatusTypeDef _disableLD2LO(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_LEFT_OUT_MIX_1, 8, 0);
+  return _writeBit(dev, WM8960_R34_LEFT_OUT_MIX_1, 8, 0);
 }
 
 HAL_StatusTypeDef _disableRD2RO(WM8960_t *dev) {
-  return _writeBit(dev, WM8960_REG_RIGHT_OUT_MIX_2, 8, 0);
+  return _writeBit(dev, WM8960_R37_RIGHT_OUT_MIX_2, 8, 0);
 }
 
 // }}}
@@ -605,11 +607,15 @@ HAL_StatusTypeDef WM8960_init(I2C_HandleTypeDef *hi2c, WM8960_t **o_dev) {
   halReturnStatus += _AINL((*o_dev));
   halReturnStatus += _AINR((*o_dev));
 
-  halReturnStatus += _enableLB2LO((*o_dev));
-  halReturnStatus += _enableRB2RO((*o_dev));
+  // LB2LO DIS (See P.35)
+  halReturnStatus += _writeBit(*o_dev, WM8960_R45_BYPASS_1, 7, 0);
+  // RB2LO DIS (See P.35)
+  halReturnStatus += _writeBit(*o_dev, WM8960_R46_BYPASS_2, 7, 0);
 
-  halReturnStatus += _disableLD2LO(*o_dev);
-  halReturnStatus += _disableRD2RO(*o_dev);
+  // LD2LO EN (p. 35)
+  halReturnStatus += _writeBit(*o_dev, WM8960_R34_LEFT_OUT_MIX_1, 8, 1);
+  // RD2LO EN (p. 35)
+  halReturnStatus += _writeBit(*o_dev, WM8960_R37_RIGHT_OUT_MIX_2, 8, 1);
 
   halReturnStatus += _setLB2LOVOL((*o_dev), WM8960_OUTPUT_MIXER_GAIN_0DB);
   halReturnStatus += _setRB2ROVOL((*o_dev), WM8960_OUTPUT_MIXER_GAIN_0DB);
@@ -617,18 +623,19 @@ HAL_StatusTypeDef WM8960_init(I2C_HandleTypeDef *hi2c, WM8960_t **o_dev) {
   halReturnStatus += _LOMIX((*o_dev));
   halReturnStatus += _ROMIX((*o_dev));
 
-  halReturnStatus += _clockConfiguration(*o_dev);
+  // halReturnStatus += _clockConfigurationNew(*o_dev);
+  // halReturnStatus += _clockConfiguration(*o_dev);
 
   // WL 16 bits (00)
   // WL 20 bits (01)
   // WL 24 bits (10)
   // WL 32 bits (11)
   halReturnStatus +=
-      _writeMultiBits(*o_dev, WM8960_REG_AUDIO_INTERFACE_1, 3, 2, 0b00);
+      _writeMultiBits(*o_dev, WM8960_R07_AUDIO_INTERFACE_1, 3, 2, 0b00);
 
   // Format i2S
   halReturnStatus +=
-      _writeMultiBits(*o_dev, WM8960_REG_AUDIO_INTERFACE_1, 1, 0, 0b10);
+      _writeMultiBits(*o_dev, WM8960_R07_AUDIO_INTERFACE_1, 1, 0, 0b10);
 
   halReturnStatus += _MS_setSlave((*o_dev));
   // halReturnStatus += _MS_setMaster(*o_dev);
@@ -637,24 +644,39 @@ HAL_StatusTypeDef WM8960_init(I2C_HandleTypeDef *hi2c, WM8960_t **o_dev) {
   halReturnStatus += _ADCR((*o_dev));
 
   // No loopback
-  halReturnStatus += _writeBit(*o_dev, WM8960_REG_AUDIO_INTERFACE_2, 0, 0);
+  halReturnStatus += _writeBit(*o_dev, WM8960_R09_AUDIO_INTERFACE_2, 0, 0);
 
   // ROUT1
-  halReturnStatus += _writeBit(*o_dev, WM8960_REG_PWR_MGMT_2, 5, 1);
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 5, 1);
 
   // LOUT1
-  halReturnStatus += _writeBit(*o_dev, WM8960_REG_PWR_MGMT_2, 6, 1);
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 6, 1);
 
   // OUT3
-  halReturnStatus += _writeBit(*o_dev, WM8960_REG_PWR_MGMT_2, 1, 1);
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 1, 1);
+
+  // DACL
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 8, 1);
+
+  // DACVU
+  halReturnStatus += _writeBit(*o_dev, WM8960_R10_LEFT_DAC_VOLUME, 8, 1);
+  halReturnStatus += _writeBit(*o_dev, WM8960_R11_RIGHT_DAC_VOLUME, 8, 1);
+
+  // DACMU
+  halReturnStatus += _writeBit(*o_dev, WM8960_R05_ADC_DAC_CTRL_1, 3, 0);
+
+  // DACR
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 7, 1);
+
+  // DACL
+  halReturnStatus += _writeBit(*o_dev, WM8960_R26_PWR_MGMT_2, 8, 1);
+
+  // ALRCGPIO, set this to 1 so that we can share the WS for ADC and DAC
+  halReturnStatus += _writeBit(*o_dev, WM8960_R09_AUDIO_INTERFACE_2, 6, 1);
+  halReturnStatus +=
+      _writeMultiBits(*o_dev, WM8960_R48_ADDITIONAL_CONTROL_4, 6, 4, 0b100);
 
   halReturnStatus += _setHeadphoneVolumeDB(*o_dev, 0.00);
-
-  if (halReturnStatus != HAL_OK) {
-    free((*o_dev));
-    (*o_dev) = NULL;
-    return halReturnStatus;
-  }
 
   return halReturnStatus;
 }
