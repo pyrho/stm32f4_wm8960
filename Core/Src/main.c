@@ -21,7 +21,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "lcd.h"
 #include "stm32f4xx_hal_i2s.h"
 #include "wm8960.h"
 #include <stdio.h>
@@ -39,25 +38,7 @@
 
 #define INT16_TO_FLOAT 1.0f / 32768.0f
 #define FLOAT_TO_INT16 32768.0f
-
-const uint16_t triangle_wave[] = {
-    0x400,  0x800,  0xc00,  0x1000, 0x1400, 0x1800, 0x1c00, 0x2000, 0x2400,
-    0x2800, 0x2c00, 0x3000, 0x3400, 0x3800, 0x3c00, 0x4000, 0x4400, 0x4800,
-    0x4c00, 0x5000, 0x5400, 0x5800, 0x5c00, 0x6000, 0x6400, 0x6800, 0x6c00,
-    0x7000, 0x7400, 0x7800, 0x7c00, 0x8000, 0x83ff, 0x87ff, 0x8bff, 0x8fff,
-    0x93ff, 0x97ff, 0x9bff, 0x9fff, 0xa3ff, 0xa7ff, 0xabff, 0xafff, 0xb3ff,
-    0xb7ff, 0xbbff, 0xbfff, 0xc3ff, 0xc7ff, 0xcbff, 0xcfff, 0xd3ff, 0xd7ff,
-    0xdbff, 0xdfff, 0xe3ff, 0xe7ff, 0xebff, 0xefff, 0xf3ff, 0xf7ff, 0xfbff,
-    0xffff, 0xfbff, 0xf7ff, 0xf3ff, 0xefff, 0xebff, 0xe7ff, 0xe3ff, 0xdfff,
-    0xdbff, 0xd7ff, 0xd3ff, 0xcfff, 0xcbff, 0xc7ff, 0xc3ff, 0xbfff, 0xbbff,
-    0xb7ff, 0xb3ff, 0xafff, 0xabff, 0xa7ff, 0xa3ff, 0x9fff, 0x9bff, 0x97ff,
-    0x93ff, 0x8fff, 0x8bff, 0x87ff, 0x83ff, 0x8000, 0x7c00, 0x7800, 0x7400,
-    0x7000, 0x6c00, 0x6800, 0x6400, 0x6000, 0x5c00, 0x5800, 0x5400, 0x5000,
-    0x4c00, 0x4800, 0x4400, 0x4000, 0x3c00, 0x3800, 0x3400, 0x3000, 0x2c00,
-    0x2800, 0x2400, 0x2000, 0x1c00, 0x1800, 0x1400, 0x1000, 0xc00,  0x800,
-    0x400,  0x0,
-};
-const uint8_t tri_cnt = 0;
+#define BUFFER_SIZE 128
 
 /* USER CODE END PD */
 
@@ -80,6 +61,8 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 WM8960_t *codecInstance = NULL;
+int16_t adcData[BUFFER_SIZE];
+int16_t dacData[BUFFER_SIZE];
 
 /* USER CODE END PV */
 
@@ -98,201 +81,13 @@ static void MX_I2S2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define BUFFER_SIZE 128
-int16_t adcData[BUFFER_SIZE];
-int16_t dacData[BUFFER_SIZE];
-
-bool dataReadyFlag = false;
-
-char g_messageBuf[60];
-
-uint16_t rxBuf[BUFFER_SIZE];
-uint16_t txBuf[BUFFER_SIZE];
-float lin_z1, lin_z2, lout_z1, lout_z2;
-float rin_z1, rin_z2, rout_z1, rout_z2;
-// left-channel, High-Pass, 1kHz, fs=96kHz, q=0.7
-float l_a0 = 0.9543457485325094f;
-float l_a1 = -1.9086914970650188f;
-float l_a2 = 0.9543457485325094f;
-float l_b1 = -1.9066459797557103f;
-float l_b2 = 0.9107370143743273f;
-
-// right-channel, Low-Pass, 1kHz, fs)96 kHz, q=0.7
-float r_a0 = 0.0010227586546542474f;
-float r_a1 = 0.002045517309308495f;
-float r_a2 = 0.0010227586546542474f;
-float r_b1 = -1.9066459797557103f;
-float r_b2 = 0.9107370143743273f;
-
-// void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s);
-// void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
-//
-//  strcpy((char *)g_messageBuf, "[WOW] Fuck yea\r\n");
-//  HAL_UART_Transmit(&huart3, (uint8_t *)&g_messageBuf, strlen(g_messageBuf),
-//                    HAL_MAX_DELAY);
-//}
-int Calc_IIR_Left(int inSample) {
-  float inSampleF = (float)inSample;
-  float outSampleF = l_a0 * inSampleF + l_a1 * lin_z1 + l_a2 * lin_z2 -
-                     l_b1 * lout_z1 - l_b2 * lout_z2;
-  lin_z2 = lin_z1;
-  lin_z1 = inSampleF;
-  lout_z2 = lout_z1;
-  lout_z1 = outSampleF;
-
-  return (int)outSampleF;
-}
-
-int Calc_IIR_Right(int inSample) {
-  float inSampleF = (float)inSample;
-  float outSampleF = r_a0 * inSampleF + r_a1 * rin_z1 + r_a2 * rin_z2 -
-                     r_b1 * rout_z1 - r_b2 * rout_z2;
-  rin_z2 = rin_z1;
-  rin_z1 = inSampleF;
-  rout_z2 = rout_z1;
-  rout_z1 = outSampleF;
-
-  return (int)outSampleF;
-}
 
 void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
 	memcpy(dacData, adcData, (BUFFER_SIZE/2) * sizeof(adcData[0]));
-  //    inBufPtr = adcData;
-  //    for(uint8_t i = 0; i < BUFFER_SIZE - 1; ++i) {
-  //    	outBufPtr[i] = inBufPtr[i];
-  //    	outBufPtr[i+1] = inBufPtr[i];
-  //    }
-
-  //    outBufPtr = dacData;
-//  dataReadyFlag = true;
-  //
-  //  // restore signed 24 bit sample from 16-bit buffers
-  //  int lSample = (int)(rxBuf[0] << 16) | rxBuf[1];
-  //  int rSample = (int)(rxBuf[2] << 16) | rxBuf[3];
-  //
-  //
-  //  // divide by 2 (rightshift) -> -3dB per sample
-  //  lSample = lSample >> 1;
-  //  rSample = rSample >> 1;
-  //
-  //  // sum to mono
-  //  lSample = rSample + lSample;
-  //  rSample = lSample;
-  //
-  //  // run HP on left channel and LP on right channel
-  //  lSample = Calc_IIR_Left(lSample);
-  //  rSample = Calc_IIR_Right(rSample);
-  //
-  //  // restore to buffer
-  //  txBuf[0] = (lSample >> 16) & 0xFFFF;
-  //  txBuf[1] = lSample & 0xFFFF;
-  //  txBuf[2] = (rSample >> 16) & 0xFFFF;
-  //  txBuf[3] = rSample & 0xFFFF;
-  // txBuf[0] = rxBuf[0];
-  // txBuf[1] = rxBuf[1];
-  // txBuf[2] = rxBuf[2];
-  // txBuf[3] = rxBuf[3];
 }
 
 void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
-  //    inBufPtr = adcData + (BUFFER_SIZE/2);
-  //    outBufPtr = dacData + (BUFFER_SIZE/2);
-  //    dataReadyFlag = true;
-
 	memcpy(dacData + (BUFFER_SIZE/2), adcData+ (BUFFER_SIZE/2), (BUFFER_SIZE/2) * sizeof(adcData[0]));
-  //     for(uint8_t i = 0; i < BUFFER_SIZE - 1; ++i) {
-  //     	outBufPtr[i] = inBufPtr[i];
-  //     	outBufPtr[i+1] = inBufPtr[i];
-  //     }
-
-  // txBuf[4] = rxBuf[4];
-  // txBuf[5] = rxBuf[5];
-  // txBuf[6] = rxBuf[6];
-  // txBuf[7] = rxBuf[7];
-
-  //
-  //  // restore signed 24 bit sample from 16-bit buffers
-  //  int lSample = (int)(rxBuf[4] << 16) | rxBuf[5];
-  //  int rSample = (int)(rxBuf[6] << 16) | rxBuf[7];
-  //
-  //  // divide by 2 (rightshift) -> -3dB per sample
-  //  lSample = lSample >> 1;
-  //  rSample = rSample >> 1;
-  //
-  //  // sum to mono
-  //  lSample = rSample + lSample;
-  //  rSample = lSample;
-  //
-  //  // run HP on left channel and LP on right channel
-  //  lSample = Calc_IIR_Left(lSample);
-  //  rSample = Calc_IIR_Right(rSample);
-  //
-  //  // restore to buffer
-  //  txBuf[4] = (lSample >> 16) & 0xFFFF;
-  //  txBuf[5] = lSample & 0xFFFF;
-  //  txBuf[6] = (rSample >> 16) & 0xFFFF;
-  //  txBuf[7] = rSample & 0xFFFF;
-}
-
-void initLcd() {
-  HD44780_Init(2);
-  HD44780_Clear();
-  HD44780_SetBacklight(1);
-  HD44780_SetCursor(0, 0);
-  HD44780_PrintStr("FXBOI:RDY");
-}
-
-void displayToLcd(char *message) {
-  HD44780_Clear();
-  HD44780_PrintStr(message);
-}
-
-void testLcd() {
-  HD44780_Init(2);
-  HD44780_Clear();
-  HD44780_SetBacklight(1);
-  HD44780_SetCursor(0, 0);
-  HD44780_PrintStr("STM32 NUCLEO");
-  HD44780_SetCursor(0, 1);
-  HD44780_PrintStr("I2C LCD DEMO");
-  HAL_Delay(2000);
-
-  HD44780_Clear();
-  HD44780_SetCursor(16, 0);
-  HD44780_PrintStr("SCROLL LEFT");
-
-  for (int i = 0; i < 20; i++) {
-    HD44780_ScrollDisplayLeft();
-    HAL_Delay(500);
-  }
-
-  HD44780_Clear();
-  HD44780_SetCursor(0, 0);
-  HD44780_PrintStr("SCROLL RIGHT");
-
-  for (int i = 0; i < 20; i++) {
-    HD44780_ScrollDisplayRight();
-    HAL_Delay(500);
-  }
-
-  HD44780_Clear();
-  HD44780_SetCursor(0, 0);
-  HD44780_PrintStr("Lets Count 0-10!");
-  HAL_Delay(2000);
-
-  char string[5];
-  for (int counter = 0; counter <= 10; counter++) {
-    itoa(counter, string, 10);
-    HD44780_Clear();
-    HD44780_SetCursor(0, 0);
-    HD44780_PrintStr(string);
-    HAL_Delay(1000);
-  }
-  HD44780_Clear();
-  HD44780_SetCursor(0, 0);
-  HD44780_PrintStr("STM32 NUCLEO");
-  HD44780_SetCursor(0, 1);
-  HD44780_PrintStr("I2C LCD DEMO END");
 }
 
 uint32_t cnt = 0;
@@ -301,7 +96,6 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
   char str[10];
 
   sprintf(&str, "%lu", cnt);
-  //  displayToLcd(&str);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
@@ -366,8 +160,6 @@ int main(void)
   // This timer is used for the incremental encoder
   HAL_TIM_Encoder_Start_IT(&htim3, TIM_CHANNEL_ALL);
   HAL_I2SEx_TransmitReceive_DMA(&hi2s2, dacData, adcData, BUFFER_SIZE);
-  // testLcd();
-  //  initLcd();
   /* USER CODE END 2 */
 
   /* Infinite loop */
