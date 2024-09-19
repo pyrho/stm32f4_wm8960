@@ -37,6 +37,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define INT16_TO_FLOAT 1.0f / 32768.0f
+#define FLOAT_TO_INT16 32768.0f
+
 const uint16_t triangle_wave[] = {
     0x400,  0x800,  0xc00,  0x1000, 0x1400, 0x1800, 0x1c00, 0x2000, 0x2400,
     0x2800, 0x2c00, 0x3000, 0x3400, 0x3800, 0x3c00, 0x4000, 0x4400, 0x4800,
@@ -67,6 +70,8 @@ const uint8_t tri_cnt = 0;
 I2C_HandleTypeDef hi2c1;
 
 I2S_HandleTypeDef hi2s2;
+DMA_HandleTypeDef hdma_spi2_rx;
+DMA_HandleTypeDef hdma_i2s2_ext_tx;
 
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
@@ -81,6 +86,7 @@ WM8960_t *codecInstance = NULL;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM3_Init(void);
@@ -92,19 +98,141 @@ static void MX_I2S2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define BUFFER_SIZE 2000
-uint16_t adcData[BUFFER_SIZE];
-uint16_t dacData[BUFFER_SIZE];
-uint16_t *inBufPtr = &adcData[0];
-uint16_t *outBufPtr = &dacData[0];
+#define BUFFER_SIZE 128
+int16_t adcData[BUFFER_SIZE];
+int16_t dacData[BUFFER_SIZE];
+
+bool dataReadyFlag = false;
+
 char g_messageBuf[60];
+
+uint16_t rxBuf[BUFFER_SIZE];
+uint16_t txBuf[BUFFER_SIZE];
+float lin_z1, lin_z2, lout_z1, lout_z2;
+float rin_z1, rin_z2, rout_z1, rout_z2;
+// left-channel, High-Pass, 1kHz, fs=96kHz, q=0.7
+float l_a0 = 0.9543457485325094f;
+float l_a1 = -1.9086914970650188f;
+float l_a2 = 0.9543457485325094f;
+float l_b1 = -1.9066459797557103f;
+float l_b2 = 0.9107370143743273f;
+
+// right-channel, Low-Pass, 1kHz, fs)96 kHz, q=0.7
+float r_a0 = 0.0010227586546542474f;
+float r_a1 = 0.002045517309308495f;
+float r_a2 = 0.0010227586546542474f;
+float r_b1 = -1.9066459797557103f;
+float r_b2 = 0.9107370143743273f;
+
 // void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s);
-//void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
+// void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
 //
 //  strcpy((char *)g_messageBuf, "[WOW] Fuck yea\r\n");
 //  HAL_UART_Transmit(&huart3, (uint8_t *)&g_messageBuf, strlen(g_messageBuf),
 //                    HAL_MAX_DELAY);
 //}
+int Calc_IIR_Left(int inSample) {
+  float inSampleF = (float)inSample;
+  float outSampleF = l_a0 * inSampleF + l_a1 * lin_z1 + l_a2 * lin_z2 -
+                     l_b1 * lout_z1 - l_b2 * lout_z2;
+  lin_z2 = lin_z1;
+  lin_z1 = inSampleF;
+  lout_z2 = lout_z1;
+  lout_z1 = outSampleF;
+
+  return (int)outSampleF;
+}
+
+int Calc_IIR_Right(int inSample) {
+  float inSampleF = (float)inSample;
+  float outSampleF = r_a0 * inSampleF + r_a1 * rin_z1 + r_a2 * rin_z2 -
+                     r_b1 * rout_z1 - r_b2 * rout_z2;
+  rin_z2 = rin_z1;
+  rin_z1 = inSampleF;
+  rout_z2 = rout_z1;
+  rout_z1 = outSampleF;
+
+  return (int)outSampleF;
+}
+
+void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
+	memcpy(dacData, adcData, (BUFFER_SIZE/2) * sizeof(adcData[0]));
+  //    inBufPtr = adcData;
+  //    for(uint8_t i = 0; i < BUFFER_SIZE - 1; ++i) {
+  //    	outBufPtr[i] = inBufPtr[i];
+  //    	outBufPtr[i+1] = inBufPtr[i];
+  //    }
+
+  //    outBufPtr = dacData;
+//  dataReadyFlag = true;
+  //
+  //  // restore signed 24 bit sample from 16-bit buffers
+  //  int lSample = (int)(rxBuf[0] << 16) | rxBuf[1];
+  //  int rSample = (int)(rxBuf[2] << 16) | rxBuf[3];
+  //
+  //
+  //  // divide by 2 (rightshift) -> -3dB per sample
+  //  lSample = lSample >> 1;
+  //  rSample = rSample >> 1;
+  //
+  //  // sum to mono
+  //  lSample = rSample + lSample;
+  //  rSample = lSample;
+  //
+  //  // run HP on left channel and LP on right channel
+  //  lSample = Calc_IIR_Left(lSample);
+  //  rSample = Calc_IIR_Right(rSample);
+  //
+  //  // restore to buffer
+  //  txBuf[0] = (lSample >> 16) & 0xFFFF;
+  //  txBuf[1] = lSample & 0xFFFF;
+  //  txBuf[2] = (rSample >> 16) & 0xFFFF;
+  //  txBuf[3] = rSample & 0xFFFF;
+  // txBuf[0] = rxBuf[0];
+  // txBuf[1] = rxBuf[1];
+  // txBuf[2] = rxBuf[2];
+  // txBuf[3] = rxBuf[3];
+}
+
+void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
+  //    inBufPtr = adcData + (BUFFER_SIZE/2);
+  //    outBufPtr = dacData + (BUFFER_SIZE/2);
+  //    dataReadyFlag = true;
+
+	memcpy(dacData + (BUFFER_SIZE/2), adcData+ (BUFFER_SIZE/2), (BUFFER_SIZE/2) * sizeof(adcData[0]));
+  //     for(uint8_t i = 0; i < BUFFER_SIZE - 1; ++i) {
+  //     	outBufPtr[i] = inBufPtr[i];
+  //     	outBufPtr[i+1] = inBufPtr[i];
+  //     }
+
+  // txBuf[4] = rxBuf[4];
+  // txBuf[5] = rxBuf[5];
+  // txBuf[6] = rxBuf[6];
+  // txBuf[7] = rxBuf[7];
+
+  //
+  //  // restore signed 24 bit sample from 16-bit buffers
+  //  int lSample = (int)(rxBuf[4] << 16) | rxBuf[5];
+  //  int rSample = (int)(rxBuf[6] << 16) | rxBuf[7];
+  //
+  //  // divide by 2 (rightshift) -> -3dB per sample
+  //  lSample = lSample >> 1;
+  //  rSample = rSample >> 1;
+  //
+  //  // sum to mono
+  //  lSample = rSample + lSample;
+  //  rSample = lSample;
+  //
+  //  // run HP on left channel and LP on right channel
+  //  lSample = Calc_IIR_Left(lSample);
+  //  rSample = Calc_IIR_Right(rSample);
+  //
+  //  // restore to buffer
+  //  txBuf[4] = (lSample >> 16) & 0xFFFF;
+  //  txBuf[5] = lSample & 0xFFFF;
+  //  txBuf[6] = (rSample >> 16) & 0xFFFF;
+  //  txBuf[7] = rSample & 0xFFFF;
+}
 
 void initLcd() {
   HD44780_Init(2);
@@ -173,7 +301,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
   char str[10];
 
   sprintf(&str, "%lu", cnt);
-//  displayToLcd(&str);
+  //  displayToLcd(&str);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
@@ -227,6 +355,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART3_UART_Init();
   MX_I2C1_Init();
   MX_TIM3_Init();
@@ -236,6 +365,7 @@ int main(void)
 
   // This timer is used for the incremental encoder
   HAL_TIM_Encoder_Start_IT(&htim3, TIM_CHANNEL_ALL);
+  HAL_I2SEx_TransmitReceive_DMA(&hi2s2, dacData, adcData, BUFFER_SIZE);
   // testLcd();
   //  initLcd();
   /* USER CODE END 2 */
@@ -243,36 +373,22 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-
   while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-
-	  memcpy(outBufPtr, inBufPtr, BUFFER_SIZE * sizeof(outBufPtr[0]));
-	 // HAL_StatusTypeDef halReturnStatus = HAL_I2SEx_TransmitReceive(&hi2s2, outBufPtr, inBufPtr, BUFFER_SIZE, 1000);
-	 HAL_StatusTypeDef halReturnStatus = HAL_I2SEx_TransmitReceive(&hi2s2, inBufPtr, inBufPtr, BUFFER_SIZE, 1000);
-
-//    HAL_StatusTypeDef halReturnStatus = HAL_I2S_Receive(
-//        &hi2s2, (uint16_t *)&adcData, BUFFER_SIZE, HAL_MAX_DELAY);
-
-//    halReturnStatus += HAL_I2S_Transmit(
-//        &hi2s2, (uint16_t *)&triangle_wave,
-//        sizeof(triangle_wave) / sizeof(triangle_wave[0]), HAL_MAX_DELAY);
-//
-//
-    // halReturnStatus += HAL_I2S_Transmit(&hi2s2, (uint16_t *)&adcData,
-    // BUFFER_SIZE, HAL_MAX_DELAY);
-
-    if (halReturnStatus != HAL_OK) {
-      strcpy((char *)messageBuf, "[ERROR] Failed to start I2S DMA.\r\n");
-      HAL_UART_Transmit(&huart3, (uint8_t *)&messageBuf, strlen(messageBuf),
-                        HAL_MAX_DELAY);
-      //      return 1;
-    }
-    // HAL_Delay(100);
-    // HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+    // memcpy(outBufPtr, inBufPtr, BUFFER_SIZE * sizeof(outBufPtr[0]));
+    //
+    // HAL_StatusTypeDef halReturnStatus =
+    //     HAL_I2SEx_TransmitReceive(&hi2s2, inBufPtr, inBufPtr, BUFFER_SIZE,
+    //     8);
+    //
+    // if (halReturnStatus != HAL_OK) {
+    //   strcpy((char *)messageBuf, "[ERROR] Failed to start I2S TX/RX.\r\n");
+    //   HAL_UART_Transmit(&huart3, (uint8_t *)&messageBuf, strlen(messageBuf),
+    //                     HAL_MAX_DELAY);
+    // }
   }
   /* USER CODE END 3 */
 }
@@ -532,6 +648,25 @@ static void MX_USART3_UART_Init(void)
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
 
 }
 
